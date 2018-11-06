@@ -4635,7 +4635,7 @@ The file from which the line was read. This field contains the absolute path to 
 
 --
 
-*`offset`*::
+*`log.offset`*::
 +
 --
 type: long
@@ -4671,19 +4671,6 @@ Log stream when reading container logs, can be 'stdout' or 'stderr'
 
 --
 
-*`prospector.type`*::
-+
---
-
-deprecated[6.3]
-
-required: True
-
-The input type from which the event was generated. This field is set to the value specified for the `type` option in the input section of the Filebeat config file. (DEPRECATED: see `input.type`)
-
-
---
-
 *`input.type`*::
 +
 --
@@ -4698,22 +4685,6 @@ The input type from which the event was generated. This field is set to the valu
 +
 --
 In case the ingest pipeline parses the timestamp from the log contents, it stores the original `@timestamp` (representing the time when the log line was read) in this field.
-
-
---
-
-*`fileset.module`*::
-+
---
-The Filebeat module that generated this event.
-
-
---
-
-*`fileset.name`*::
-+
---
-The Filebeat fileset that generated this event.
 
 
 --
