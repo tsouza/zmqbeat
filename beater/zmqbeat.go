@@ -1,26 +1,25 @@
 package beater
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
 
 	"github.com/tsouza/zmqbeat/config"
 
-	"github.com/zeromq/goczmq"
+	zmq "github.com/pebbe/zmq4"
 )
 
 // Zmqbeat configuration.
 type Zmqbeat struct {
-	done   chan struct{}
-	config config.Config
-	client beat.Client
-
-	pull *goczmq.Channeler
+	done      chan struct{}
+	config    config.Config
+	client    beat.Client
+	closing   bool
+	receivers []*zmq.Socket
 }
 
 // New creates an instance of zmqbeat.
@@ -31,112 +30,74 @@ func New(b *beat.Beat, cfg *common.Config) (beat.Beater, error) {
 	}
 
 	bt := &Zmqbeat{
-		done:   make(chan struct{}),
-		config: c,
+		done:      make(chan struct{}),
+		config:    c,
+		closing:   false,
+		receivers: make([]*zmq.Socket, len(c.Pull)),
 	}
 	return bt, nil
 }
 
 // Run starts zmqbeat.
 func (bt *Zmqbeat) Run(b *beat.Beat) error {
-	logp.Info("zmqbeat is running! Hit CTRL-C to stop it.")
-
 	var err error
 	bt.client, err = b.Publisher.Connect()
 	if err != nil {
 		return err
 	}
 
-	bt.pull = goczmq.NewPullChanneler(bt.config.Bind)
+	events := make(chan beat.Event)
 
-	for {
-		select {
-		case msg := <-bt.pull.RecvChan:
-			var body bytes.Buffer
-			for _, part := range msg {
-				body.WriteString(string(part))
-			}
-			event := beat.Event{
-				Timestamp: time.Now(),
-				Fields: common.MapStr{
-					"test": body.String(),
-				},
-			}
-			bt.client.Publish(event)
+	for idx, pullConfig := range bt.config.Pull {
+		var receiver *zmq.Socket
+		if (pullConfig.Connect == "" && pullConfig.Bind == "") ||
+			(pullConfig.Connect != "" && pullConfig.Bind != "") {
+			return errors.New("Either 'connect' or 'bind' must be configured")
 		}
-	}
-
-	/*bt.ctx, err = zmq.NewContext()
-	if err != nil {
-		panic(err)
-	}
-
-	bt.sock, err = bt.ctx.Socket(zmq.Pull)
-	if err != nil {
-		panic(err)
-	}
-
-	bt.chans = bt.sock.Channels()
-
-	if err = bt.sock.Connect(bt.config.Connect); err != nil {
-		panic(err)
-	}
-
-	for {
-		select {
-		case msg := <-bt.chans.In():
-			var body bytes.Buffer
-			for _, part := range msg {
-				body.WriteString(string(part))
-			}
-			event := beat.Event{
-				Timestamp: time.Now(),
-				Fields: common.MapStr{
-					"test": body.String(),
-				},
-			}
-			bt.client.Publish(event)
-		case err := <-bt.chans.Errors():
-			panic(err)
+		receiver, err = zmq.NewSocket(zmq.PULL)
+		if err != nil {
+			return err
 		}
-	}*/
+		if pullConfig.Connect != "" {
+			receiver.Connect(pullConfig.Connect)
+		} else {
+			receiver.Bind(pullConfig.Bind)
+		}
+		tags := pullConfig.Tags
+		bt.receivers[idx] = receiver
+		go func() {
+			for {
+				data, err := receiver.Recv(0)
+				if err != nil {
+					return
+				}
+				event := beat.Event{
+					Timestamp: time.Now(),
+					Fields: common.MapStr{
+						"data": data,
+						"tags": tags,
+					},
+				}
+				events <- event
+			}
+		}()
+	}
 
-	/*ticker := time.NewTicker(bt.config.Period)
-	counter := 1
 	for {
 		select {
+		case event := <-events:
+			bt.client.Publish(event)
 		case <-bt.done:
 			return nil
-		case <-ticker.C:
 		}
-
-		event := beat.Event{
-			Timestamp: time.Now(),
-			Fields: common.MapStr{
-				"type":    b.Info.Name,
-				"counter": counter,
-			},
-		}
-		bt.client.Publish(event)
-		logp.Info("Event sent")
-		counter++
-	}*/
+	}
 }
 
 // Stop stops zmqbeat.
 func (bt *Zmqbeat) Stop() {
-	if bt.pull != nil {
-		bt.pull.Destroy()
+	bt.closing = true
+	for _, receiver := range bt.receivers {
+		receiver.Close()
 	}
-	/*if bt.chans != nil {
-		bt.chans.Close()
-	}
-	if bt.sock != nil {
-		bt.sock.Close()
-	}
-	if bt.ctx != nil {
-		bt.ctx.Close()
-	}
-	bt.client.Close()*/
 	close(bt.done)
 }

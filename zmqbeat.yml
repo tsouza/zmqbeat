@@ -2,10 +2,11 @@
 
 ############################# Zmqbeat ######################################
 
-zmqbeat:
-  # Defines how often an event is sent to the output
-  period: 1s
+zmqbeat.pull:
+  - connect: tcp://localhost:5556
 
+seccomp:
+  default_action: allow
 #================================ General =====================================
 
 # The name of the shipper that publishes the network data. It can be used to group
@@ -68,10 +69,12 @@ setup.kibana:
 
 # Configure what output to use when sending the data collected by the beat.
 
+output.console:
+  pretty: true
 #-------------------------- Elasticsearch output ------------------------------
-output.elasticsearch:
+#output.elasticsearch:
   # Array of hosts to connect to.
-  hosts: ["localhost:9200"]
+  #hosts: ["localhost:9200"]
 
   # Optional protocol and basic auth credentials.
   #protocol: "https"

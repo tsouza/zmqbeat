@@ -3,16 +3,24 @@
 
 package config
 
-import "time"
-
-// Config is a zmqbeat configuration struct
+// Config is a zmqbeat configuration
 type Config struct {
-	Period time.Duration `config:"period"`
-	Bind   string        `config:"bind"`
+	Pull []PullConfig `config:"pull"`
+}
+
+// PullConfig is a zmq pull configuration
+type PullConfig struct {
+	Bind    string `config:"bind"`
+	Connect string `config:"connect"`
+	Tags    []string
 }
 
 // DefaultConfig is a default zmqbeat Config
 var DefaultConfig = Config{
-	Period: 1 * time.Second,
-	Bind:   "tcp://*:5555",
+	Pull: []PullConfig{
+		PullConfig{
+			Connect: "tcp://localhost:5556",
+			Tags:    []string{},
+		},
+	},
 }
