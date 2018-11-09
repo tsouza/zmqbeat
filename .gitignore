@@ -79,6 +79,7 @@ Temporary Items
 .DS_Store
 /zmqbeat
 /zmqbeat.test
+/vendor
 /logs
 /data
 *.pyc
