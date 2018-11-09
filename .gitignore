@@ -16,7 +16,6 @@
 *.out
 
 ### Go Patch ###
-/vendor/
 /Godeps/
 
 ### Linux ###
@@ -82,7 +81,6 @@ Temporary Items
 /zmqbeat.test
 /logs
 /data
-/vendor
 *.pyc
 
 # End of https://www.gitignore.io/api/go,linux,macos,visualstudiocode
